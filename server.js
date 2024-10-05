@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const Todo = require('./models/Todo');
 
-var app = express();
+const app = express();
 
 // CORS configuration to allow requests from your frontend URL
 app.use(cors({
@@ -16,7 +16,9 @@ app.use(cors({
 app.use(express.json());
 
 // Connect to your MongoDB database (replace with your database URL)
-mongoose.connect("mongodb+srv://admin:0754092850@todoapp.aqby3.mongodb.net/");
+mongoose.connect("mongodb+srv://admin:0754092850@todoapp.aqby3.mongodb.net/")
+    .then(() => console.log("MongoDB connected"))
+    .catch((error) => console.error("MongoDB connection error:", error));
 
 // Check for database connection errors
 mongoose.connection.on("error", (error) => {
@@ -26,40 +28,39 @@ mongoose.connection.on("error", (error) => {
 // Get saved tasks from the database
 app.get("/getTodoList", (req, res) => {
     Todo.find({})
-        .then((todoList) => res.json(todoList))
-        .catch((err) => res.json(err));
+        .then((todoList) => res.status(200).json(todoList))
+        .catch((err) => res.status(500).json({ message: "Error retrieving todo list", error: err }));
 });
 
 // Add new task to the database
 app.post("/addTodoList", (req, res) => {
-    Todo.create({
-        task: req.body.task,
-        status: req.body.status,
-        deadline: req.body.deadline, 
-    })
-        .then((todo) => res.json(todo))
-        .catch((err) => res.json(err));
+    const { task, status, deadline } = req.body;  // Destructure request body
+    Todo.create({ task, status, deadline })
+        .then((todo) => res.status(201).json(todo))
+        .catch((err) => res.status(500).json({ message: "Error adding todo", error: err }));
 });
 
 // Update task fields (including deadline)
-app.post("/updateTodoList/:id", (req, res) => {
+app.put("/updateTodoList/:id", (req, res) => {
     const id = req.params.id;
-    const updateData = {
-        task: req.body.task,
-        status: req.body.status,
-        deadline: req.body.deadline, 
-    };
-    Todo.findByIdAndUpdate(id, updateData)
-        .then((todo) => res.json(todo))
-        .catch((err) => res.json(err));
+    const updateData = req.body;  // Use the entire request body to update
+    Todo.findByIdAndUpdate(id, updateData, { new: true }) // Add { new: true } to return the updated document
+        .then((todo) => {
+            if (!todo) return res.status(404).json({ message: "Todo not found" });
+            res.status(200).json(todo);
+        })
+        .catch((err) => res.status(500).json({ message: "Error updating todo", error: err }));
 });
 
 // Delete task from the database
 app.delete("/deleteTodoList/:id", (req, res) => {
     const id = req.params.id;
-    Todo.findByIdAndDelete({ _id: id })
-        .then((todo) => res.json(todo))
-        .catch((err) => res.json(err));
+    Todo.findByIdAndDelete(id)
+        .then((todo) => {
+            if (!todo) return res.status(404).json({ message: "Todo not found" });
+            res.status(200).json({ message: "Todo deleted successfully", todo });
+        })
+        .catch((err) => res.status(500).json({ message: "Error deleting todo", error: err }));
 });
 
 // Set up the server to listen on the specified port
